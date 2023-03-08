@@ -125,7 +125,7 @@ class PTEID_SE(Security_Environment):
 
         logger.debug(f"Compute digital signature p1={hex(p1)} p2={hex(p2)} dsl={len(self.data_to_sign)} ds={hexlify(self.data_to_sign)} d={data}")
 
-        if p1 != 0x9E or p2 not in (0x9A, 0xAC, 0xBC):
+        if p1 != 0x9E or p2 != 0x9A:
             raise SwError(SW["ERR_INCORRECTP1P2"])
 
         if self.dst.key is None:
@@ -134,19 +134,8 @@ class PTEID_SE(Security_Environment):
         if self.data_to_sign is None:
             raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
 
-        to_sign = b''
-    
-        if p2 == 0x9A:  # Data to be signed
-            to_sign = self.data_to_sign
+        to_sign = self.data_to_sign # Data to be signed
 
-        elif p2 == 0xAC:  # Data objects, sign values
-            to_sign = b''
-            structure = unpack(data)
-            for tag, length, value in structure:
-                to_sign += value
-        elif p2 == 0xBC:  # Data objects to be signed
-            logger.warning("Data objects to be signed: 0xBC")
-        
         logger.debug(f"Actual data signed: {hexlify(to_sign)}")
         self.signature = bytes(self.dst.key.sign(
             to_sign,
