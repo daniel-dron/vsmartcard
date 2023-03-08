@@ -88,7 +88,7 @@ class PTEIDOS(Iso7816OS):
             f"FormatResult: ins={hex(ins)} p1={hex(p1)} p2={hex(p2)} le={le} length={len(data)} sw={hex(sw)}")
         
         if ins == 0xb0 and le == 0 or ins == 0xa4:
-            le = min(255, len(data))
+            le = min(256, len(data))
 
         if ins == 0xa4 and len(data):
             self.lastCommandSW = sw
