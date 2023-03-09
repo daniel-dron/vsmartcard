@@ -234,7 +234,7 @@ if user_auth is None or user_auth_private_key is None:
         x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME,
                            u'Cidadão Português VIRTUAL'),
         x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME,
-                           u'Autentidação do Cidadão VIRTUAL'),
+                           u'Autenticação do Cidadão VIRTUAL'),
         x509.NameAttribute(NameOID.COUNTRY_NAME, u'PT')
     ])
 
