@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2021 João Paulo Barraca
+# Copyright (C) 2023 André Guerreiro
 # 
 # This file is part of virtualsmartcard.
 #
@@ -18,6 +19,7 @@
 
 from virtualsmartcard.SmartcardSAM import SAM
 from virtualsmartcard.SWutils import SwError, SW
+from virtualsmartcard.TLVutils import pack, unpack, bertlv_pack
 from virtualsmartcard.SEutils import ControlReferenceTemplate, \
     Security_Environment
 from virtualsmartcard.utils import C_APDU, hexdump
@@ -35,7 +37,7 @@ logger = logging.getLogger('pteid')
 logger.setLevel(logging.DEBUG)
 
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.asymmetric import padding, utils
 from cryptography.hazmat.primitives.serialization import load_der_private_key
 from cryptography.hazmat.backends import default_backend
 
@@ -101,17 +103,60 @@ class PTEIDOS(Iso7816OS):
         return r
 
 
-
 class PTEID_SE(Security_Environment):
 
     def __init__(self, MF, SAM):
         Security_Environment.__init__(self, MF, SAM)
         logger.debug("Using PTEID SE")
+        self.PTEID_ALGORITHMS = {}
+        self.PTEID_ALGORITHMS[0x10] = "SHA-1"
+        self.PTEID_ALGORITHMS[0x30] = "SHA-224"
+        self.PTEID_ALGORITHMS[0x40] = "SHA-256"
+        self.PTEID_ALGORITHMS[0x50] = "SHA-384"
+        self.PTEID_ALGORITHMS[0x60] = "SHA-512"
+        self.PTEID_ALGORITHMS[0x02] = "RSA-PKCS1v15"
+        self.PTEID_ALGORITHMS[0x04] = "ECDSA"
+        self.PTEID_ALGORITHMS[0x05] = "RSA-PSS"
         self.at.algorithm = 'SHA'
         self.data_to_sign = b''
         self.signature = b''
+        self.hash_algorithm = ''
+        self.signature_algorithm = ''
+        self.key_id = 0
 
         logger.debug(f"AT: {self.at.algorithm}")
+
+    def parse_SE_config(self, data):
+        error = False
+        structure = unpack(data)
+        for tlv in structure:
+            tag, length, value = tlv
+            if tag == 0x80:
+                if len(value) > 1 or value[0] & 0xF0 not in self.PTEID_ALGORITHMS or value[0] & 0x0F not in self.PTEID_ALGORITHMS:
+                    error = True
+                    logger.debug(f"Invalid value for tag algo ID: {value}")
+                else:
+                    self.hash_algorithm = self.PTEID_ALGORITHMS[value[0] & 0xF0]
+                    self.signature_algorithm = self.PTEID_ALGORITHMS[value[0] & 0x0F]
+                    logger.debug(f"Hash: {self.hash_algorithm} Signature: {self.signature_algorithm}")
+            elif tag == 0x84:
+                self.key_id = value
+            else:
+                error = True
+
+        if error:
+            raise SwError(SW["ERR_REFNOTUSABLE"])
+        else:
+            return SW["NORMAL"], ""
+
+    def manage_security_environment(self, p1, p2, data):
+        if p1 != 0x41:
+            raise SwError(SW["ERR_INCORRECTP1P2"])
+        #TODO: we only support DIGITAL SIGNATURE template for now
+        if p2 != 0xB6:
+            logger.warning(f'MSE SET unsupported param P2: {p2:2x}')
+            raise SwError(SW["ERR_INCORRECTP1P2"])
+        return self.parse_SE_config(data)
 
     def compute_digital_signature(self, p1, p2, data):
 
@@ -134,18 +179,21 @@ class PTEID_SE(Security_Environment):
         if self.data_to_sign is None:
             raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
 
+        if not self.sam.verificationStatus():
+            raise SwError(SW["ERR_SECSTATUS"])
+
         to_sign = self.data_to_sign # Data to be signed
 
-        logger.debug(f"Actual data signed: {hexlify(to_sign)}")
         self.signature = bytes(self.dst.key.sign(
             to_sign,
             padding.PKCS1v15(),
-            hashes.SHA1()
+            utils.Prehashed(hashes.SHA256())
         ))
 
-        logger.debug(f"Signature: {self.signature}")
-        return self.signature
+        self.sam.resetVerificationStatus()
 
+        logger.debug(f"Signature: {hexlify(self.signature)}")
+        return self.signature
 
     def hash(self, p1, p2, data):
         """
@@ -154,13 +202,23 @@ class PTEID_SE(Security_Environment):
 
         :return: raw data (no TLV coding).
         """
-        logger.debug("Compute Hash {hex(p1)} {hex(p2)} {hexlify(data[17:])}")
-        
-        ## OpenSC driver will add data to beginning. Must remove it.
-        hash_data = data[-20:] #super().hash(p1, p2, data[17:])
-        logger.debug(f"Hash_data: {hexlify(hash_data)}")
+        logger.debug(f"Compute Hash {hex(p1)} {hex(p2)} {hexlify(data)}")
 
-        self.data_to_sign = hash_data
+        if p1 != 0x90 or p2 not in (0x80, 0xA0):
+            raise SwError(SW["ERR_INCORRECTP1P2"])
+        #Most common case: hash performed externally
+        if p2 == 0xA0:
+            tlv_list = unpack(data)
+            tag, length, value = tlv_list[0]
+            #Tag 90 is required for the input data template
+            if tag == 0x90:
+                hash_data = value
+                #TODO: Check length of input data for current algorithm
+                logger.debug(f"Hash_data: {hexlify(hash_data)}")
+                self.data_to_sign = hash_data
+            else:
+                raise SwError(SW["ERR_INCORRECTPARAMETERS"])
+        #TODO: Hash performed totally or partially by the card
 
         return hash_data
 
@@ -168,7 +226,9 @@ class PTEID_SAM(SAM):
     def __init__(self, mf=None, private_key=None):
         SAM.__init__(self, None, None, mf, default_se=PTEID_SE)
         self.current_SE = self.default_se(self.mf, self)
+        #TODO: read PIN values from card.json
         self.PIN = b'1111'
+        self.pin_is_verified = False
 
         self.current_SE.ht.algorithm = "SHA"
         self.current_SE.algorithm = "AES-CBC"
@@ -192,15 +252,32 @@ class PTEID_SAM(SAM):
 
         return r, b''
 
+    #TODO: multiple PINs
+    def verificationStatus(self):
+        return self.pin_is_verified
+
+    def resetVerificationStatus(self):
+        self.pin_is_verified = False
+
     def verify(self, p1, p2, PIN):
-        PIN = PIN.replace(b"\0", b"").strip()  # Strip NULL characters
-        PIN = PIN.replace(b"\xFF", b"")  # Strip \xFF characters
+        PIN = PIN.replace(b"\xFF", b"")        # Strip \xFF characters
         logger.debug("PIN to use: %s", PIN)
 
+        #A VERIFY command without PIN value means GET RETRY counter
         if len(PIN) == 0:
-            raise SwError(SW["WARN_NOINFO63"])
-
-        return super().verify(p1, p2, PIN)
+            return 0x63C0 | self.counter, b''
+        if self.counter > 0:
+            #XX: The unblock PINs actually have 5 retries
+            if self.PIN == PIN:
+                self.counter = 3
+                self.pin_is_verified = True
+                return SW["NORMAL"], ""
+            else:
+                self.counter -= 1
+                self.pin_is_verified = False
+                return 0x63C0 | self.counter, ""
+        else:
+            raise SwError(SW["ERR_AUTHBLOCKED"])
 
 class PTEID_MF(MF):  # {{{
     def getDataPlain(self, p1, p2, data):
