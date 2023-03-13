@@ -288,9 +288,11 @@ class PTEID_MF(MF):  # {{{
         tag = (p1 << 8) + p2
         if tag == 0xDF03:
             return 0x6E00, b''
-
-        sys.exit(0)
-        return 0x9000, b''
+        elif tag == 0xDF30:      #Applet version info: hardcoded IAS v 4.4.2
+            return 0x9000, b'\xDF\x30\x07\x34\x2E\x34\x2E\x32\x2E\x41'
+        else:
+            logger.warning("Unsupported tag in GET DATA cmd: {tag:4x}")
+            raise SwError(SW["ERR_INCORRECTP1P2"])
 
     def readBinaryPlain(self, p1, p2, data):
         logger.debug(f"Read Binary P1={hex(p1)} P2={hex(p2)} {data}")
