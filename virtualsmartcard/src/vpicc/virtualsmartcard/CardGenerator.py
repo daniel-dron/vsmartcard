@@ -667,7 +667,7 @@ class CardGenerator(object):
                        data=b"\x00\x00\x00\x01\x00\x01\x00\x00"))  # EF.ICCSN
         self.sam = CryptoflexSAM(self.mf)
 
-    def __generate_PTEID(self):
+    def __generate_PTEID(self, pteid_data_file):
         def ___get_fs_entry(data, fid):
 
             obj = data.get(fid, {})
@@ -691,9 +691,9 @@ class CardGenerator(object):
         from virtualsmartcard.cards.PTEID import PTEID_SAM
         import json
         from binascii import a2b_base64
-        logging.info("Opening card.json")
+        logging.info(f"Opening data file: {pteid_data_file}")
             
-        f = open('card.json', 'r')
+        f = open(pteid_data_file, 'r')
         data = json.loads(f.read())
         f.close()
         
@@ -758,9 +758,10 @@ class CardGenerator(object):
 
         self.mf.append(adf)
         private_key = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
+        #TODO: PTEID SAM should support at least 2 private keys
         self.sam = PTEID_SAM(self.mf, private_key=private_key)
 
-    def generateCard(self):
+    def generateCard(self, pteid_card_data=None):
         """Generate a new card"""
         if self.type == 'iso7816':
             self.__generate_iso_card()
@@ -771,14 +772,14 @@ class CardGenerator(object):
         elif self.type == 'nPA':
             self.__generate_nPA()
         elif self.type == 'PTEID':
-            self.__generate_PTEID()
+            self.__generate_PTEID(pteid_card_data)
         else:
             return (None, None)
 
-    def getCard(self):
+    def getCard(self, pteid_card_data=None):
         """Get the MF and SAM from the current card"""
         if self.sam is None or self.mf is None:
-            self.generateCard()
+            self.generateCard(pteid_card_data)
         return self.mf, self.sam
 
     def setCard(self, mf=None, sam=None):

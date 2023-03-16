@@ -412,7 +412,7 @@ class VirtualICC(object):
     def __init__(self, datasetfile, card_type, host, port,
                  readernum=None, mitmPath=None, ef_cardsecurity=None, ef_cardaccess=None,
                  ca_key=None, cvca=None, disable_checks=False, esign_key=None,
-                 esign_ca_cert=None, esign_cert=None,
+                 esign_ca_cert=None, esign_cert=None, pteid_data_file=None,
                  logginglevel=logging.INFO):
         from os.path import exists
 
@@ -429,7 +429,7 @@ class VirtualICC(object):
                              datasetfile)
                 self.cardGenerator.readDatagroups(datasetfile)
 
-        MF, SAM = self.cardGenerator.getCard()
+        MF, SAM = self.cardGenerator.getCard(pteid_data_file)
 
         # Generate an OS object of the correct card_type
         if card_type == "iso7816" or card_type == "ePass":
@@ -451,7 +451,7 @@ class VirtualICC(object):
             from virtualsmartcard.cards.Relay import RelayOS
             from virtualsmartcard.cards.RelayMiddleman import RelayMiddleman
             mitm = loadMitMFromPath(mitmPath) if mitmPath else RelayMiddleman()
-            self.os = RelayOS(readernum,mitm=mitm) 
+            self.os = RelayOS(readernum,mitm=mitm)
         elif card_type == "handler_test":
             from virtualsmartcard.cards.HandlerTest import HandlerTestOS
             self.os = HandlerTestOS()
