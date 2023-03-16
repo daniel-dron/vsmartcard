@@ -148,6 +148,14 @@ class PTEID_SE(Security_Environment):
             raise SwError(SW["ERR_REFNOTUSABLE"])
         else:
             return SW["NORMAL"], ""
+        
+    def __check_dst_input_hash_length(self, length):
+        digest_sizes = {20: 'SHA-1', 28: 'SHA-224', 32: 'SHA-256', 48: 'SHA-384', 64: 'SHA-512'}
+        try: 
+            digest_type = digest_sizes[length]
+            return digest_type == self.hash_algorithm
+        except KeyError:
+            return False
 
     def manage_security_environment(self, p1, p2, data):
         if p1 != 0x41:
@@ -213,7 +221,8 @@ class PTEID_SE(Security_Environment):
             #Tag 90 is required for the input data template
             if tag == 0x90:
                 hash_data = value
-                #TODO: Check length of input data for current algorithm
+                if not self.__check_dst_input_hash_length(length):
+                    raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
                 logger.debug(f"Hash_data: {hexlify(hash_data)}")
                 self.data_to_sign = hash_data
             else:
