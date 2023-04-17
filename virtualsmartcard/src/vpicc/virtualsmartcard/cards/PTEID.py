@@ -37,7 +37,7 @@ logger = logging.getLogger('pteid')
 logger.setLevel(logging.DEBUG)
 
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding, utils
+from cryptography.hazmat.primitives.asymmetric import ec, padding, utils
 from cryptography.hazmat.primitives.serialization import load_der_private_key
 from cryptography.hazmat.backends import default_backend
 
@@ -165,6 +165,14 @@ class PTEID_SE(Security_Environment):
             logger.warning(f'MSE SET unsupported param P2: {p2:2x}')
             raise SwError(SW["ERR_INCORRECTP1P2"])
         return self.parse_SE_config(data)
+    
+    def __current_hash_algorithm(self):
+        if self.hash_algorithm == 'SHA-256':
+            return hashes.SHA256()
+        elif self.hash_algorithm == 'SHA-384':
+            return hashes.SHA384()
+        elif self.hash_algorithm == 'SHA-512':
+            return hashes.SHA512()
 
     def compute_digital_signature(self, p1, p2, data):
 
@@ -172,7 +180,6 @@ class PTEID_SE(Security_Environment):
         Compute a digital signature for the given data.
         Algorithm and key are specified in the current SE
         """
-        
         if self.data_to_sign == b'':
             return self.signature
 
@@ -189,15 +196,36 @@ class PTEID_SE(Security_Environment):
 
         if not self.sam.verificationStatus():
             raise SwError(SW["ERR_SECSTATUS"])
+        
+        logger.debug(f"Current SE contains algo: {self.signature_algorithm}")
 
         to_sign = self.data_to_sign # Data to be signed
+        # Get Key type of our private key
+        try:
+            ec_curve = self.dst.key.curve
+            is_ecdsa = True
+        except AttributeError:
+            is_ecdsa = False
+        
+        if is_ecdsa and self.signature_algorithm != "ECDSA":
+            raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
+        
+        if not is_ecdsa and self.signature_algorithm == "ECDSA":
+            raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
 
-        self.signature = bytes(self.dst.key.sign(
-            to_sign,
-            padding.PKCS1v15(),
-            utils.Prehashed(hashes.SHA256())
-        ))
-
+        if is_ecdsa:
+            logger.debug(f"Using private key of elliptic curve: {ec_curve}")
+            self.signature = bytes(self.dst.key.sign(
+                to_sign,
+                ec.ECDSA(utils.Prehashed(self.__current_hash_algorithm()))
+            ))
+        else:
+            self.signature = bytes(self.dst.key.sign(
+                to_sign,
+                padding.PKCS1v15(),
+                utils.Prehashed(self.__current_hash_algorithm())
+                ))
+        
         self.sam.resetVerificationStatus()
 
         logger.debug(f"Signature: {hexlify(self.signature)}")
