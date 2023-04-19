@@ -122,6 +122,8 @@ class PTEID_SE(Security_Environment):
         self.signature = b''
         self.hash_algorithm = ''
         self.signature_algorithm = ''
+        self.key1 = None
+        self.key2 = None
         self.key_id = 0
 
         logger.debug(f"AT: {self.at.algorithm}")
@@ -140,7 +142,8 @@ class PTEID_SE(Security_Environment):
                     self.signature_algorithm = self.PTEID_ALGORITHMS[value[0] & 0x0F]
                     logger.debug(f"Hash: {self.hash_algorithm} Signature: {self.signature_algorithm}")
             elif tag == 0x84:
-                self.key_id = value
+                self.key_id = int(value[0])
+                self.dst.key = self.key1 if self.key_id == 1 else self.key2
             else:
                 error = True
 
@@ -197,9 +200,10 @@ class PTEID_SE(Security_Environment):
         if not self.sam.verificationStatus():
             raise SwError(SW["ERR_SECSTATUS"])
         
-        logger.debug(f"Current SE contains algo: {self.signature_algorithm}")
+        logger.debug(f"Current SE contains algo: {self.signature_algorithm} and key_id: {self.key_id}")
 
         to_sign = self.data_to_sign # Data to be signed
+
         # Get Key type of our private key
         try:
             ec_curve = self.dst.key.curve
@@ -259,7 +263,7 @@ class PTEID_SE(Security_Environment):
         return hash_data
 
 class PTEID_SAM(SAM):
-    def __init__(self, mf=None, private_key=None):
+    def __init__(self, mf=None, auth_private_key=None, sign_private_key=None):
         SAM.__init__(self, None, None, mf, default_se=PTEID_SE)
         self.current_SE = self.default_se(self.mf, self)
         #TODO: read PIN values from card.json
@@ -269,7 +273,8 @@ class PTEID_SAM(SAM):
         self.current_SE.ht.algorithm = "SHA"
         self.current_SE.algorithm = "AES-CBC"
 
-        self.current_SE.dst.key = load_der_private_key(private_key, password=None, backend=default_backend())
+        self.current_SE.key1 = load_der_private_key(sign_private_key, password=None, backend=default_backend())
+        self.current_SE.key2 = load_der_private_key(auth_private_key, password=None, backend=default_backend())
 
     def handle_0x80(self, p1, p2, data):
         logger.debug(f"Handle 0x80 {hex(p1)} {hex(p2)} {hex(data)}")

@@ -755,9 +755,10 @@ class CardGenerator(object):
                                               extra_fci_data=fci))
 
         self.mf.append(adf)
-        private_key = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
-        #TODO: PTEID SAM should support at least 2 private keys
-        self.sam = PTEID_SAM(self.mf, private_key=private_key)
+        private_key1 = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
+        private_key2 = binascii.a2b_base64(data.get('sign-private-key', {}).get('data', None))
+
+        self.sam = PTEID_SAM(self.mf, auth_private_key=private_key1, sign_private_key=private_key2)
 
     def generateCard(self, pteid_card_data=None):
         """Generate a new card"""
