@@ -148,7 +148,7 @@ class PTEID_SE(Security_Environment):
             raise SwError(SW["ERR_REFNOTUSABLE"])
         else:
             return SW["NORMAL"], ""
-        
+
     def __check_dst_input_hash_length(self, length):
         digest_sizes = {20: 'SHA-1', 28: 'SHA-224', 32: 'SHA-256', 48: 'SHA-384', 64: 'SHA-512'}
         try: 
@@ -209,7 +209,6 @@ class PTEID_SE(Security_Environment):
         
         if is_ecdsa and self.signature_algorithm != "ECDSA":
             raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
-        
         if not is_ecdsa and self.signature_algorithm == "ECDSA":
             raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
 
@@ -341,6 +340,7 @@ class PTEID_MF(MF):  # {{{
             return 0x9000, result
         except Exception as e:
             logger.exception(f"{e}")
+            raise
 
 
     def selectFile(self, p1, p2, data):
