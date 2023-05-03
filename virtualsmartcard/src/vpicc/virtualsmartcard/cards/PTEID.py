@@ -278,10 +278,9 @@ class PTEID_SAM(SAM):
 
     def change_reference_data(self, p1, p2, data):
         SAM.verify(self, p1, p2, data[:4])
-
         self.PIN = data[8:12]
+        self.resetVerificationStatus();
         return SW["NORMAL"], ""
-        # SAM.change_reference_data(self, p1, p2, new_PIN)
 
     def handle_0x80(self, p1, p2, data):
         logger.debug(f"Handle 0x80 {hex(p1)} {hex(p2)} {hex(data)}")
