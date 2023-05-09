@@ -197,7 +197,7 @@ class PTEID_SE(Security_Environment):
         if self.data_to_sign is None:
             raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
 
-        if not self.sam.verificationStatus(p2):
+        if not self.sam.verificationStatus(self.sam.SIGN_PIN_ID):
             raise SwError(SW["ERR_SECSTATUS"])
         
         logger.debug(f"Current SE contains algo: {self.signature_algorithm} and key_id: {self.key_id}")
@@ -229,7 +229,7 @@ class PTEID_SE(Security_Environment):
                 utils.Prehashed(self.__current_hash_algorithm())
                 ))
         
-        self.sam.resetVerificationStatus(p2)
+        self.sam.resetVerificationStatus(self.sam.SIGN_PIN_ID)
 
         logger.debug(f"Signature: {hexlify(self.signature)}")
         return self.signature
