@@ -327,7 +327,7 @@ class PTEID_SAM(SAM):
                 return SW["NORMAL"], ""
             else:
                 pin_info['counter'] -= 1
-                pin_info['verifier'] = False
+                pin_info['verified'] = False
                 return 0x63C0 | pin_info['counter'], ""
         else:
             raise SwError(SW["ERR_AUTHBLOCKED"])
