@@ -197,7 +197,10 @@ class PTEID_SE(Security_Environment):
         if self.data_to_sign is None:
             raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
 
-        if not self.sam.verificationStatus(self.sam.last_verified_pin):
+        # Get the corresponding PIN ID relative to the key_id
+        PIN_ID = self.sam.KEY_IDS[self.key_id]
+
+        if not self.sam.verificationStatus(PIN_ID):
             raise SwError(SW["ERR_SECSTATUS"])
         
         logger.debug(f"Current SE contains algo: {self.signature_algorithm} and key_id: {self.key_id}")
@@ -229,7 +232,7 @@ class PTEID_SE(Security_Environment):
                 utils.Prehashed(self.__current_hash_algorithm())
                 ))
         
-        self.sam.resetVerificationStatus(self.sam.last_verified_pin)
+        self.sam.resetVerificationStatus(PIN_ID)
 
         logger.debug(f"Signature: {hexlify(self.signature)}")
         return self.signature
@@ -270,7 +273,12 @@ class PTEID_SAM(SAM):
         self.AUTH_PIN_ID = 0x81
         self.SIGN_PIN_ID = 0x82
 
-        self.last_verified_pin = 0
+        self.AUTH_KEY_ID = 2
+        self.SIGN_KEY_ID = 1
+
+        self.KEY_IDS = {}
+        self.KEY_IDS[self.AUTH_KEY_ID] = self.AUTH_PIN_ID
+        self.KEY_IDS[self.SIGN_KEY_ID] = self.SIGN_PIN_ID
 
         self.PIN_INFO = {}
         self.PIN_INFO[self.AUTH_PIN_ID] = {'value': b'1111', 'verified': False, 'counter': 3}
@@ -317,7 +325,6 @@ class PTEID_SAM(SAM):
         logger.debug("PIN to use: %s", PIN)
         
         pin_info = self.PIN_INFO[p2]
-        self.last_verified_pin = p2
 
         #A VERIFY command without PIN value means GET RETRY counter
         if len(PIN) == 0:
