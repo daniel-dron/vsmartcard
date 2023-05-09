@@ -197,7 +197,7 @@ class PTEID_SE(Security_Environment):
         if self.data_to_sign is None:
             raise SwError(SW["ERR_CONDITIONNOTSATISFIED"])
 
-        if not self.sam.verificationStatus():
+        if not self.sam.verificationStatus(p2):
             raise SwError(SW["ERR_SECSTATUS"])
         
         logger.debug(f"Current SE contains algo: {self.signature_algorithm} and key_id: {self.key_id}")
@@ -229,7 +229,7 @@ class PTEID_SE(Security_Environment):
                 utils.Prehashed(self.__current_hash_algorithm())
                 ))
         
-        self.sam.resetVerificationStatus()
+        self.sam.resetVerificationStatus(p2)
 
         logger.debug(f"Signature: {hexlify(self.signature)}")
         return self.signature
@@ -267,8 +267,12 @@ class PTEID_SAM(SAM):
         SAM.__init__(self, None, None, mf, default_se=PTEID_SE)
         self.current_SE = self.default_se(self.mf, self)
         #TODO: read PIN values from card.json
-        self.PIN = b'1111'
-        self.pin_is_verified = False
+        self.AUTH_PIN_ID = 0x81
+        self.SIGN_PIN_ID = 0x82
+
+        self.PIN_INFO = {}
+        self.PIN_INFO[self.AUTH_PIN_ID] = {'value': b'1111', 'verified': False, 'counter': 3}
+        self.PIN_INFO[self.SIGN_PIN_ID] = {'value': b'1234', 'verified': False, 'counter': 3}
 
         self.current_SE.ht.algorithm = "SHA"
         self.current_SE.algorithm = "AES-CBC"
@@ -277,9 +281,10 @@ class PTEID_SAM(SAM):
         self.current_SE.key2 = load_der_private_key(auth_private_key, password=None, backend=default_backend())
 
     def change_reference_data(self, p1, p2, data):
-        SAM.verify(self, p1, p2, data[:4])
-        self.PIN = data[8:12]
-        self.resetVerificationStatus();
+        self.verify(p1, p2, data[:4])
+
+        self.PIN_INFO[p2]['value'] = data[8:12]
+        self.resetVerificationStatus(p2);
         return SW["NORMAL"], ""
 
     def handle_0x80(self, p1, p2, data):
@@ -299,30 +304,31 @@ class PTEID_SAM(SAM):
 
         return r, b''
 
-    #TODO: multiple PINs
-    def verificationStatus(self):
-        return self.pin_is_verified
+    def verificationStatus(self, id):
+        return self.PIN_INFO[id]['verified']
 
-    def resetVerificationStatus(self):
-        self.pin_is_verified = False
+    def resetVerificationStatus(self, id):
+        self.PIN_INFO[id]['verified'] = False
 
     def verify(self, p1, p2, PIN):
         PIN = PIN.replace(b"\xFF", b"")        # Strip \xFF characters
         logger.debug("PIN to use: %s", PIN)
+        
+        pin_info = self.PIN_INFO[p2]
 
         #A VERIFY command without PIN value means GET RETRY counter
         if len(PIN) == 0:
-            return 0x63C0 | self.counter, b''
-        if self.counter > 0:
+            return 0x63C0 | pin_info['counter'], b''
+        if pin_info['counter'] > 0:
             #XX: The unblock PINs actually have 5 retries
-            if self.PIN == PIN:
-                self.counter = 3
-                self.pin_is_verified = True
+            if pin_info['value'] == PIN:
+                pin_info['counter'] = 3
+                pin_info['verified'] = True
                 return SW["NORMAL"], ""
             else:
-                self.counter -= 1
-                self.pin_is_verified = False
-                return 0x63C0 | self.counter, ""
+                pin_info['counter'] -= 1
+                pin_info['verifier'] = False
+                return 0x63C0 | pin_info['counter'], ""
         else:
             raise SwError(SW["ERR_AUTHBLOCKED"])
 
