@@ -700,63 +700,34 @@ class CardGenerator(object):
         name, fci, fdata = ___get_fs_entry(data, '3f00')
         self.mf = PTEID_MF(dfname=name)
 
-        name, fci, fdata = ___get_fs_entry(data, '3f00-0001')
-        fk = DF(parent=self.mf, fid=0x0001,
-                    dfname=name,
-                    extra_fci_data=fci)
-        self.mf.append(fk)
+        #
+        # load files from NATIONAL DATA application ID
+        #
 
-        name, fci, fdata = ___get_fs_entry(data, '3f00-4f01')
-        info_a = DF(parent=self.mf, fid=0x4f01,
-                    dfname=name,
-                    extra_fci_data=fci)
+        # EF.DG1 FID = 01 01
+        name, fci, fdata = ___get_fs_entry(data, '3f00-0101')
+        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x0101, data=fdata, extra_fci_data=fci))
 
-        self.mf.append(info_a)
+        # EF.DG2 FID = 01 02
+        name, fci, fdata = ___get_fs_entry(data, '3f00-0102')
+        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x0102, data=fdata, extra_fci_data=fci))
 
-        # OK
+        # EF.DG13 FID = 01 0D
+        name, fci, fdata = ___get_fs_entry(data, '3f00-010D')
+        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x010D, data=fdata, extra_fci_data=fci))
 
-        # EF DIR
-        for fid in [0x2f00, 0x0003]:
-            path = '3f00-%04x' % (fid,)
-            name, fci, fdata = ___get_fs_entry(data, path)
-            self.mf.append(TransparentStructureEF(parent=self.mf, fid=fid,
-                                                  data=fdata,
-                                                  extra_fci_data=fci))
+        # EF.DG15 FID = 01 0F
+        name, fci, fdata = ___get_fs_entry(data, '3f00-010F')
+        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x010F, data=fdata, extra_fci_data=fci))
 
-        # TRACE
+        # EF.COM FID = 01 1E
+        name, fci, fdata = ___get_fs_entry(data, '3f00-011E')
+        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x011E, data=fdata, extra_fci_data=fci))
 
+        # EF.SOD FID = 01 1D
+        name, fci, fdata = ___get_fs_entry(data, '3f00-011D')
+        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x011D, data=fdata, extra_fci_data=fci))
 
-        # ADF CIA PKI
-        name, fci, fdata = ___get_fs_entry(data, '3f00-4f00')
-        adf_cia = DF(parent=self.mf, fid=0x4F00,
-                     dfname=name,
-                     extra_fci_data=fci)
-
-        for fid in [0x5031, 0x5032]:
-            path = '3f00-4f00-%04x' % (fid, )
-            name, fci, fdata = ___get_fs_entry(data, path)
-            adf_cia.append(TransparentStructureEF(parent=adf_cia, fid=fid,
-                                                  data=fdata,
-                                                  extra_fci_data=fci))
-
-        self.mf.append(adf_cia)
-
-        # ADF PKI
-        name, fci, fdata = ___get_fs_entry(data, '3f00-5f00')
-        adf = DF(parent=self.mf, fid=0x5f00, dfname=name, extra_fci_data=fci)
-
-        for fid in [0x4401, 0xef0c, 0xEF02,
-                    0xEF05, 0xEF06, 0xEF07,
-                    0xEF08, 0xEF09, 0xEF0D,
-                    0xEF0E, 0xEF0F, 0xEF10,
-                    0xEF11, 0xEF12]:
-            path = '3f00-5f00-%04x' % (fid, )
-            name, fci, fdata = ___get_fs_entry(data, path)
-            adf.append(TransparentStructureEF(parent=adf, fid=fid,
-                                              data=fdata,
-                                              extra_fci_data=fci))
-
-        self.mf.append(adf)
         private_key1 = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
         private_key2 = binascii.a2b_base64(data.get('sign-private-key', {}).get('data', None))
 
