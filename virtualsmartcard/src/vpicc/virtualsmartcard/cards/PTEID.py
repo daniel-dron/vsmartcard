@@ -401,11 +401,6 @@ class PTEID_MF(MF):  # {{{
         if data == b'\x4f\x00':
             p1 |= 8
 
-        if data == b'\x60\x46\x32\xFF\x00\x00\x03':
-            return 0x9000, b''
-        if data == b'\x60\x46\x32\xFF\x00\x00\x04':
-            return 0x9000, b''
-
         # Will fail with exception if File Not Found
         file = self._selectFile(p1, p2, data)
         self.current = file
