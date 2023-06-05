@@ -703,30 +703,10 @@ class CardGenerator(object):
         #
         # load files from NATIONAL DATA application ID
         #
-
-        # EF.DG1 FID = 01 01
-        name, fci, fdata = ___get_fs_entry(data, '3f00-0101')
-        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x0101, data=fdata, extra_fci_data=fci))
-
-        # EF.DG2 FID = 01 02
-        name, fci, fdata = ___get_fs_entry(data, '3f00-0102')
-        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x0102, data=fdata, extra_fci_data=fci))
-
-        # EF.DG13 FID = 01 0D
-        name, fci, fdata = ___get_fs_entry(data, '3f00-010D')
-        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x010D, data=fdata, extra_fci_data=fci))
-
-        # EF.DG15 FID = 01 0F
-        name, fci, fdata = ___get_fs_entry(data, '3f00-010F')
-        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x010F, data=fdata, extra_fci_data=fci))
-
-        # EF.COM FID = 01 1E
-        name, fci, fdata = ___get_fs_entry(data, '3f00-011E')
-        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x011E, data=fdata, extra_fci_data=fci))
-
-        # EF.SOD FID = 01 1D
-        name, fci, fdata = ___get_fs_entry(data, '3f00-011D')
-        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x011D, data=fdata, extra_fci_data=fci))
+        for fid in [0x0101, 0x0102, 0x010D, 0x010F, 0x011E, 0x011D]:
+            path = '3f00-%04x' % (fid, )
+            name, fci, fdata = ___get_fs_entry(data, path)
+            self.mf.append(TransparentStructureEF(parent=self.mf, fid=fid, data=fdata, extra_fci_data=fci))
 
         private_key1 = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
         private_key2 = binascii.a2b_base64(data.get('sign-private-key', {}).get('data', None))
