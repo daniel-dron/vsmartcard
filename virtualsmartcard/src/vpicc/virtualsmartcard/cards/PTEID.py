@@ -401,8 +401,9 @@ class PTEID_MF(MF):  # {{{
         if data == b'\x4f\x00':
             p1 |= 8
 
-        # Patch Applet AID
-        if data == b'\x60\x46\x32\xFF\x00\x00\x02':
+        if data == b'\x60\x46\x32\xFF\x00\x00\x03':
+            return 0x9000, b''
+        if data == b'\x60\x46\x32\xFF\x00\x00\x04':
             return 0x9000, b''
 
         # Will fail with exception if File Not Found
