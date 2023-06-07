@@ -42,8 +42,9 @@ from cryptography.hazmat.primitives.serialization import load_der_private_key
 from cryptography.hazmat.backends import default_backend
 
 class PTEIDOS(Iso7816OS):
-    def __init__(self, mf, sam, ins2handler=None, maxle=MAX_SHORT_LE):
+    def __init__(self, mf, sam, app_ids, ins2handler=None, maxle=MAX_SHORT_LE):
         Iso7816OS.__init__(self, mf, sam, ins2handler, maxle)
+        self.app_ids = app_ids
         self.atr = '\x3B\xFF\x96\x00\x00\x81\x31\xFE\x43\x80\x31\x80\x65\xB0\x85\x04\x01\x20\x12\x0F\xFF\x82\x90\x00\xD0'
 
     def execute(self, msg):
@@ -68,9 +69,16 @@ class PTEIDOS(Iso7816OS):
             if c.ins == 0x80:
                 sw, result = self.sam.handle_0x80(c.p1, c.p2, c.data)
             else:
-                sw, result = self.ins2handler.get(c.ins, notImplemented)(c.p1,
-                                                                         c.p2,
-                                                                         c.data)
+                # intercept select AID's to handle MF swap
+                INS_SELECT_AID = c.ins == 0xA4 and c.p1 & 0x4 != 0
+                if INS_SELECT_AID and c.data in self.app_ids:
+                    self.swapMf(self.app_ids[c.data])
+                    sw = 0x9000
+
+                else:
+                    sw, result = self.ins2handler.get(c.ins, notImplemented)(c.p1,
+                                                                             c.p2,
+                                                                             c.data)
         except SwError as e:
             #logger.error(self.ins2handler.get(c.ins, None))
             logger.exception("SWERROR")
