@@ -34,7 +34,6 @@ import sys
 import json
 
 logger = logging.getLogger('pteid')
-logger.setLevel(logging.DEBUG)
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, padding, utils
