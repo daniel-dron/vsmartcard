@@ -66,41 +66,7 @@ class Iso7816OS(SmartcardOS):
         self.SAM = sam
 
         if not ins2handler:
-            self.ins2handler = {
-                    0x0c: self.mf.eraseRecord,
-                    0x0e: self.mf.eraseBinaryPlain,
-                    0x0f: self.mf.eraseBinaryEncapsulated,
-                    0x2a: self.SAM.perform_security_operation,
-                    0x20: self.SAM.verify,
-                    0x22: self.SAM.manage_security_environment,
-                    0x24: self.SAM.change_reference_data,
-                    0x46: self.SAM.generate_public_key_pair,
-                    0x82: self.SAM.external_authenticate,
-                    0x84: self.SAM.get_challenge,
-                    0x88: self.SAM.internal_authenticate,
-                    0xa0: self.mf.searchBinaryPlain,
-                    0xa1: self.mf.searchBinaryEncapsulated,
-                    0xa4: self.mf.selectFile,
-                    0xb0: self.mf.readBinaryPlain,
-                    0xb1: self.mf.readBinaryEncapsulated,
-                    0xb2: self.mf.readRecordPlain,
-                    0xb3: self.mf.readRecordEncapsulated,
-                    0xc0: self.getResponse,
-                    0xca: self.mf.getDataPlain,
-                    0xcb: self.mf.getDataEncapsulated,
-                    0xd0: self.mf.writeBinaryPlain,
-                    0xd1: self.mf.writeBinaryEncapsulated,
-                    0xd2: self.mf.writeRecord,
-                    0xd6: self.mf.updateBinaryPlain,
-                    0xd7: self.mf.updateBinaryEncapsulated,
-                    0xda: self.mf.putDataPlain,
-                    0xdb: self.mf.putDataEncapsulated,
-                    0xdc: self.mf.updateRecordPlain,
-                    0xdd: self.mf.updateRecordEncapsulated,
-                    0xe0: self.mf.createFile,
-                    0xe2: self.mf.appendRecord,
-                    0xe4: self.mf.deleteFile,
-                    }
+            self.updateHandlers()
         else:
             self.ins2handler = ins2handler
 
@@ -118,6 +84,43 @@ class Iso7816OS(SmartcardOS):
                                      histChars=inttostring(0x80) +
                                      inttostring(0x70 + len(card_capabilities)) +
                                      card_capabilities)
+
+    def updateHandlers(self):
+        self.ins2handler = {
+            0x0c: self.mf.eraseRecord,
+            0x0e: self.mf.eraseBinaryPlain,
+            0x0f: self.mf.eraseBinaryEncapsulated,
+            0x2a: self.SAM.perform_security_operation,
+            0x20: self.SAM.verify,
+            0x22: self.SAM.manage_security_environment,
+            0x24: self.SAM.change_reference_data,
+            0x46: self.SAM.generate_public_key_pair,
+            0x82: self.SAM.external_authenticate,
+            0x84: self.SAM.get_challenge,
+            0x88: self.SAM.internal_authenticate,
+            0xa0: self.mf.searchBinaryPlain,
+            0xa1: self.mf.searchBinaryEncapsulated,
+            0xa4: self.mf.selectFile,
+            0xb0: self.mf.readBinaryPlain,
+            0xb1: self.mf.readBinaryEncapsulated,
+            0xb2: self.mf.readRecordPlain,
+            0xb3: self.mf.readRecordEncapsulated,
+            0xc0: self.getResponse,
+            0xca: self.mf.getDataPlain,
+            0xcb: self.mf.getDataEncapsulated,
+            0xd0: self.mf.writeBinaryPlain,
+            0xd1: self.mf.writeBinaryEncapsulated,
+            0xd2: self.mf.writeRecord,
+            0xd6: self.mf.updateBinaryPlain,
+            0xd7: self.mf.updateBinaryEncapsulated,
+            0xda: self.mf.putDataPlain,
+            0xdb: self.mf.putDataEncapsulated,
+            0xdc: self.mf.updateRecordPlain,
+            0xdd: self.mf.updateRecordEncapsulated,
+            0xe0: self.mf.createFile,
+            0xe2: self.mf.appendRecord,
+            0xe4: self.mf.deleteFile,
+            }
 
     def getATR(self):
         return self.atr
@@ -356,6 +359,10 @@ class Iso7816OS(SmartcardOS):
 
         return answer
 
+    def swapMf(self, mf):
+        self.mf = mf
+        self.updateHandlers()
+
     def powerUp(self):
         self.mf.current = self.mf
 
@@ -430,6 +437,7 @@ class VirtualICC(object):
                 self.cardGenerator.readDatagroups(datasetfile)
 
         MF, SAM = self.cardGenerator.getCard(pteid_data_file)
+        APP_IDS = self.cardGenerator.getAppIDs()
 
         # Generate an OS object of the correct card_type
         if card_type == "iso7816" or card_type == "ePass":
@@ -446,7 +454,7 @@ class VirtualICC(object):
             self.os = CryptoflexOS(MF, SAM)
         elif card_type == "PTEID":
             from virtualsmartcard.cards.PTEID import PTEIDOS
-            self.os = PTEIDOS(MF, SAM)
+            self.os = PTEIDOS(MF, SAM, APP_IDS)
         elif card_type == "relay":
             from virtualsmartcard.cards.Relay import RelayOS
             from virtualsmartcard.cards.RelayMiddleman import RelayMiddleman

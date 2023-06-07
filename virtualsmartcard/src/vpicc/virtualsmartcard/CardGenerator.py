@@ -697,50 +697,56 @@ class CardGenerator(object):
         data = json.loads(f.read())
         f.close()
         
+        # create the default MF
         name, fci, fdata = ___get_fs_entry(data, '3f00')
-        self.mf = PTEID_MF(dfname=name)
+        default_mf = PTEID_MF(dfname=name) 
+        card_access_name, card_access_fci, card_access_fdata = ___get_fs_entry(data, '3f00-011c')
+        default_mf.append(TransparentStructureEF(parent=default_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
+        self.mf = default_mf
 
-        # EF.CARDACCESS
-        name, fci, fdata = ___get_fs_entry(data, '3f00-011c')
-        self.mf.append(TransparentStructureEF(parent=self.mf, fid=0x011C, data=fdata, extra_fci_data=fci))
+        # create NATIONAL DATA MF
+        name, fci, fdata = ___get_fs_entry(data, '3f00')
+        ndata_mf = PTEID_MF(dfname=name)
+        ndata_mf.append(TransparentStructureEF(parent=ndata_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
+        for fid in [0x0101, 0x0102, 0x010D, 0x010F, 0x011E, 0x011D]:
+            path = '3f00-604632ff000004-%04x' % (fid, )
+            name, fci, fdata = ___get_fs_entry(data, path)
+            ndata_mf.append(TransparentStructureEF(parent=ndata_mf, fid=fid, data=fdata, extra_fci_data=fci))
 
         # TODO: DF.ADF_CIA_PKI & DF.ADF_PKI
         # EID application ID (604632ff000003)
-        eid = DF(parent=self.mf, fid=0xffff, dfname=b'\x60\x46\x32\xFF\x00\x00\x03') ## {{{
+        name, fci, fdata = ___get_fs_entry(data, '3f00')
+        eid_mf = PTEID_MF(dfname=name)
+        eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
         name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-2f00')    # EF.DIR
-        eid.append(TransparentStructureEF(parent=eid, fid=0x2f00, data=fdata, extra_fci_data=fci))
+        eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x2f00, data=fdata, extra_fci_data=fci))
 
         name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-0003')    # EF.TRACE
-        eid.append(TransparentStructureEF(parent=eid, fid=0x0003, data=fdata, extra_fci_data=fci))
+        eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x0003, data=fdata, extra_fci_data=fci))
 
-        adf_cia_pki = DF(parent = eid, fid=0x4f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x72') # DF.ADF_CIA_PKI
+        adf_cia_pki = DF(parent = eid_mf, fid=0x4f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x72') # DF.ADF_CIA_PKI
         for fid in [0x5031, 0x5032]:
             name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-4f00-%04x' % (fid, ))
             adf_cia_pki.append(TransparentStructureEF(parent=adf_cia_pki, fid=fid, data=fdata, extra_fci_data=fci))    
-        eid.append(adf_cia_pki)
+        eid_mf.append(adf_cia_pki)
 
-        adf_pki = DF(parent = eid, fid=0x5f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x73') # DF.ADF_PKI
+        adf_pki = DF(parent = eid_mf, fid=0x5f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x73') # DF.ADF_PKI
         for fid in [0xEF01, 0xEF02, 0xEF03, 0xEF04, 0xEF05, 0xEF06, 0xEF07, 0xEF08, 0xEF09,
                     0xEF0A, 0xEF0B, 0xEF0C, 0xEF0D, 0xEF0E, 0xEF0F, 0xEF10, 0xEF11, 0x4401]:
             name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-5f00-%04x' % (fid, ))
             adf_pki.append(TransparentStructureEF(parent=adf_pki, fid=fid, data=fdata, extra_fci_data=fci))    
-        eid.append(adf_pki)
-
-        self.mf.append(eid)
+        eid_mf.append(adf_pki)
         ## }}}
 
-        # NATIONAL DATA application ID (604632ff000004)
-        national_data = DF(parent=self.mf, fid=0xfffe, dfname=b'\x60\x46\x32\xFF\x00\x00\x04')
-        for fid in [0x0101, 0x0102, 0x010D, 0x010F, 0x011E, 0x011D]:
-            path = '3f00-604632ff000004-%04x' % (fid, )
-            name, fci, fdata = ___get_fs_entry(data, path)
-            national_data.append(TransparentStructureEF(parent=national_data, fid=fid, data=fdata, extra_fci_data=fci))
-        self.mf.append(national_data)
+        self.app_ids = {
+            b'\x60\x46\x32\xFF\x00\x00\x04': ndata_mf,
+            b'\x60\x46\x32\xFF\x00\x00\x03': eid_mf
+        }
 
         private_key1 = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
         private_key2 = binascii.a2b_base64(data.get('sign-private-key', {}).get('data', None))
 
-        self.sam = PTEID_SAM(self.mf, auth_private_key=private_key1, sign_private_key=private_key2)
+        self.sam = PTEID_SAM(default_mf, auth_private_key=private_key1, sign_private_key=private_key2)
 
     def generateCard(self, pteid_card_data=None):
         """Generate a new card"""
@@ -762,6 +768,9 @@ class CardGenerator(object):
         if self.sam is None or self.mf is None:
             self.generateCard(pteid_card_data)
         return self.mf, self.sam
+    
+    def getAppIDs(self):
+        return self.app_ids
 
     def setCard(self, mf=None, sam=None):
         """Set the MF and SAM of the current card"""
