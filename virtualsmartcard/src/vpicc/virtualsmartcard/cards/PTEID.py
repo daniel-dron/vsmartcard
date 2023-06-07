@@ -66,19 +66,16 @@ class PTEIDOS(Iso7816OS):
 
         try:
             logger.debug(f"Handle {hex(c.ins)}")
-            if c.ins == 0x80:
-                sw, result = self.sam.handle_0x80(c.p1, c.p2, c.data)
-            else:
-                # intercept select AID's to handle MF swap
-                INS_SELECT_AID = c.ins == 0xA4 and c.p1 & 0x4 != 0
-                if INS_SELECT_AID and c.data in self.app_ids:
-                    self.swapMf(self.app_ids[c.data])
-                    sw = 0x9000
+            # intercept select AID's to handle MF swap
+            INS_SELECT_AID = c.ins == 0xA4 and c.p1 & 0x4 != 0
+            if INS_SELECT_AID and c.data in self.app_ids:
+                self.swapMf(self.app_ids[c.data])
+                sw = 0x9000
 
-                else:
-                    sw, result = self.ins2handler.get(c.ins, notImplemented)(c.p1,
-                                                                             c.p2,
-                                                                             c.data)
+            else:
+                sw, result = self.ins2handler.get(c.ins, notImplemented)(c.p1,
+                                                                         c.p2,
+                                                                         c.data)
         except SwError as e:
             #logger.error(self.ins2handler.get(c.ins, None))
             logger.exception("SWERROR")
@@ -304,11 +301,6 @@ class PTEID_SAM(SAM):
         self.PIN_INFO[p2]['value'] = data[8:12]
         self.resetVerificationStatus(p2);
         return SW["NORMAL"], ""
-
-    def handle_0x80(self, p1, p2, data):
-        logger.debug(f"Handle 0x80 {hex(p1)} {hex(p2)} {hex(data)}")
-        sys.exit(-1)
-        return 0x9000, b''
 
     def parse_SE_config(self, config):
         r = 0x9000
