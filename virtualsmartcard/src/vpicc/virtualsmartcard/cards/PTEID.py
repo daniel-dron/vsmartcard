@@ -351,9 +351,11 @@ class PTEID_MF(MF):  # {{{
         if tag == 0xDF03:
             return 0x6E00, b''
         elif tag == 0xDF30:      #Applet version info: hardcoded IAS v 4.4.2
-            return 0x9000, b'\xDF\x30\x07\x34\x2E\x34\x2E\x32\x2E\x41'
+            return 0x9000, b'\xDF\x30\x09\x35\x2E\x32\x2E\x30\x2E\x41\x2E\x43'
+        elif tag == 0x9F7F:      #CPLC info consistent with IAS 5.0 test cards
+            return 0x9000, b'\x9F\x7F\x2A\x40\x90\x00\x39\x19\x81\x10\x55\x05\x00\x31\x24\x1E\x01\xC6\x68\xB0\x79\x12\x92\x31\x24\x12\x93\x31\x24\x12\x94\x31\x24\x00\x00\x00\x20\x00\x00\x00\x00\x00\x00\x00\x00'
         else:
-            logger.warning("Unsupported tag in GET DATA cmd: {tag:4x}")
+            logger.warning(f"Unsupported tag in GET DATA cmd: {tag:4X}")
             raise SwError(SW["ERR_INCORRECTP1P2"])
 
     def readBinaryPlain(self, p1, p2, data):
