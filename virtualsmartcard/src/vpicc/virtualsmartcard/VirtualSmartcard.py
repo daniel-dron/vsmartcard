@@ -102,7 +102,7 @@ class Iso7816OS(SmartcardOS):
             0xa0: self.mf.searchBinaryPlain,
             0xa1: self.mf.searchBinaryEncapsulated,
             0xa4: self.mf.selectFile,
-            0xb0: self.mf.readBinaryPlain,
+            0xb0: self.mf.readBinaryPlain,              
             0xb1: self.mf.readBinaryEncapsulated,
             0xb2: self.mf.readRecordPlain,
             0xb3: self.mf.readRecordEncapsulated,
@@ -250,7 +250,7 @@ class Iso7816OS(SmartcardOS):
                 self.lastCommandSW = sw
                 sw = SW["NORMAL_REST"] + min(0xff, l)
         else:
-            if le > len(data):
+            if sw != SW["ERR_FILENOTFOUND"] and le > len(data):
                 sw = SW["WARN_EOFBEFORENEREAD"]
 
         if le is not None:
