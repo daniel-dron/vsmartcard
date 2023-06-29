@@ -1471,6 +1471,9 @@ class TransparentStructureEF(EF):
         """
         See EF for more.
         """
+        if shortfid == 0:
+            shortfid = fid & 0b11111
+
         EF.__init__(self, parent, fid,
                     filedescriptor, lifecycle,
                     simpletlv_data, bertlv_data,
