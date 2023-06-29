@@ -699,7 +699,8 @@ class CardGenerator(object):
         name, fci, fdata = ___get_fs_entry(data, '3f00')
         default_mf = PTEID_MF(dfname=name) 
         card_access_name, card_access_fci, card_access_fdata = ___get_fs_entry(data, '3f00-011c')
-        default_mf.append(TransparentStructureEF(parent=default_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
+        if len(card_access_fdata) != 0:
+            default_mf.append(TransparentStructureEF(parent=default_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
         self.mf = default_mf
 
         # create NATIONAL DATA MF
@@ -709,7 +710,8 @@ class CardGenerator(object):
         for fid in [0x0101, 0x0102, 0x010D, 0x010F, 0x011E, 0x011D]:
             path = '3f00-604632ff000004-%04x' % (fid, )
             name, fci, fdata = ___get_fs_entry(data, path)
-            ndata_mf.append(TransparentStructureEF(parent=ndata_mf, fid=fid, data=fdata, extra_fci_data=fci))
+            if len(fdata) != 0:
+                ndata_mf.append(TransparentStructureEF(parent=ndata_mf, fid=fid, data=fdata, extra_fci_data=fci))
 
         # TODO: DF.ADF_CIA_PKI & DF.ADF_PKI
         # EID application ID (604632ff000003)
@@ -717,22 +719,28 @@ class CardGenerator(object):
         eid_mf = PTEID_MF(dfname=name)
         eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
         name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-2f00')    # EF.DIR
-        eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x2f00, data=fdata, extra_fci_data=fci))
+        if len(fdata) != 0:
+            eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x2f00, data=fdata, extra_fci_data=fci))
 
         name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-0003')    # EF.TRACE
-        eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x0003, data=fdata, extra_fci_data=fci))
+        if len(fdata) != 0:
+            eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x0003, data=fdata, extra_fci_data=fci))
 
         adf_cia_pki = DF(parent = eid_mf, fid=0x4f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x72') # DF.ADF_CIA_PKI
         for fid in [0x5031, 0x5032]:
             name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-4f00-%04x' % (fid, ))
-            adf_cia_pki.append(TransparentStructureEF(parent=adf_cia_pki, fid=fid, data=fdata, extra_fci_data=fci))    
+            if len(fdata) != 0:
+                adf_cia_pki.append(TransparentStructureEF(parent=adf_cia_pki, fid=fid, data=fdata, extra_fci_data=fci))    
         eid_mf.append(adf_cia_pki)
 
         adf_pki = DF(parent = eid_mf, fid=0x5f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x73') # DF.ADF_PKI
         for fid in [0xEF01, 0xEF02, 0xEF03, 0xEF04, 0xEF05, 0xEF06, 0xEF07, 0xEF08, 0xEF09,
                     0xEF0A, 0xEF0B, 0xEF0C, 0xEF0D, 0xEF0E, 0xEF0F, 0xEF10, 0xEF11, 0x4401]:
             name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-5f00-%04x' % (fid, ))
-            adf_pki.append(TransparentStructureEF(parent=adf_pki, fid=fid, data=fdata, extra_fci_data=fci))    
+            if len(fdata) != 0:
+                adf_pki.append(TransparentStructureEF(parent=adf_pki, fid=fid, data=fdata, extra_fci_data=fci))
+            else:
+                print("fdata empty for fid %04x" % (fid))
         eid_mf.append(adf_pki)
         ## }}}
 
