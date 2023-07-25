@@ -701,11 +701,13 @@ class CardGenerator(object):
         card_access_name, card_access_fci, card_access_fdata = ___get_fs_entry(data, '3f00-011c')
         if len(card_access_fdata) != 0:
             default_mf.append(TransparentStructureEF(parent=default_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
+        default_mf.identifier = "DEFAULT"
         self.mf = default_mf
 
         # create NATIONAL DATA MF
         name, fci, fdata = ___get_fs_entry(data, '3f00')
         ndata_mf = PTEID_MF(dfname=name)
+        ndata_mf.identifier = "NATIONAL_DATA"
         ndata_mf.append(TransparentStructureEF(parent=ndata_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
         for fid in [0x0101, 0x0102, 0x010D, 0x010F, 0x011E, 0x011D]:
             path = '3f00-604632ff000004-%04x' % (fid, )
@@ -717,6 +719,7 @@ class CardGenerator(object):
         # EID application ID (604632ff000003)
         name, fci, fdata = ___get_fs_entry(data, '3f00')
         eid_mf = PTEID_MF(dfname=name)
+        eid_mf.identifier = "EID"
         eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
         name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000003-2f00')    # EF.DIR
         if len(fdata) != 0:

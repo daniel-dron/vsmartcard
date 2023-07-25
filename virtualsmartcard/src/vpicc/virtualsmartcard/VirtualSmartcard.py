@@ -368,6 +368,7 @@ class Iso7816OS(SmartcardOS):
 
     def swapMf(self, mf):
         self.mf = mf
+        self.SAM.mf = mf
         self.updateHandlers()
 
     def powerUp(self):
