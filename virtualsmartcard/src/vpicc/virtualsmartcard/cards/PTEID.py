@@ -294,7 +294,13 @@ class PTEID_SAM(SAM):
         self.current_SE.key1 = load_der_private_key(sign_private_key, password=None, backend=default_backend())
         self.current_SE.key2 = load_der_private_key(auth_private_key, password=None, backend=default_backend())
 
+    def getCurrentApplication(self):
+        return self.mf.identifier
+
     def change_reference_data(self, p1, p2, data):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        
         self.verify(p1, p2, data[:4])
 
         self.PIN_INFO[p2]['value'] = data[8:12]
@@ -312,14 +318,23 @@ class PTEID_SAM(SAM):
             logger.exception("e")
 
         return r, b''
-
+    
     def verificationStatus(self, id):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+
         return self.PIN_INFO[id]['verified']
 
     def resetVerificationStatus(self, id):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        
         self.PIN_INFO[id]['verified'] = False
 
     def verify(self, p1, p2, PIN):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        
         PIN = PIN.replace(b"\xFF", b"")        # Strip \xFF characters
         logger.debug("PIN to use: %s", PIN)
         
