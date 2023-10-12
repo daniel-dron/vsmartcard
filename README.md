@@ -4,6 +4,17 @@ Virtual Smart Card Architecture is an umbrella project for various
 projects concerned with the emulation of different types of smart card readers
 or smart cards themselves.
 
+Environment setup:
+```bash
+	python3 -m venv /path/to/new/virtual/environment
+	source /path/to/new/virtual/environment/bin/activate
+```
+
+On the root folder install the required python packages:
+```bash
+	pip install -r requirements.txt
+```
+
 Currently the following projects are part of Virtual Smart Card Architecture: 
 
 - [Virtual Smart Card](http://frankmorgner.github.io/vsmartcard/virtualsmartcard/README.html)
