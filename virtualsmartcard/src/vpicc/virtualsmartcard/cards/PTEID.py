@@ -272,6 +272,7 @@ class PTEID_SAM(SAM):
         #TODO: read PIN values from card.json
         self.AUTH_PIN_ID = 0x81
         self.SIGN_PIN_ID = 0x82
+        self.ADDR_PIN_ID = 0x83
 
         self.AUTH_KEY_ID = 2
         self.SIGN_KEY_ID = 1
@@ -283,6 +284,7 @@ class PTEID_SAM(SAM):
         self.PIN_INFO = {}
         self.PIN_INFO[self.AUTH_PIN_ID] = {'value': b'1111', 'verified': False, 'counter': 3}
         self.PIN_INFO[self.SIGN_PIN_ID] = {'value': b'1234', 'verified': False, 'counter': 3}
+        self.PIN_INFO[self.ADDR_PIN_ID] = {'value': b'0000', 'verified': False, 'counter': 3}
 
         self.current_SE.ht.algorithm = "SHA"
         self.current_SE.algorithm = "AES-CBC"
@@ -324,6 +326,11 @@ class PTEID_SAM(SAM):
         PIN = PIN.replace(b"\xFF", b"")        # Strip \xFF characters
         logger.debug("PIN to use: %s", PIN)
         
+        logger.debug("READIGN ADDRESS!!!\n")
+        logger.debug("READIGN ADDRESS!!!\n")
+        logger.debug("READIGN ADDRESS!!!\n")
+        logger.debug("READIGN ADDRESS!!!\n")
+        logger.debug(f"READIGN {p2} {self.ADDR_PIN_ID}\n")
         pin_info = self.PIN_INFO[p2]
 
         #A VERIFY command without PIN value means GET RETRY counter
