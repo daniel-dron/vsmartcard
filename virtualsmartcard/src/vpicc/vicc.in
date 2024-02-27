@@ -114,6 +114,9 @@ pteid = parser.add_argument_group('Emulation of Portuguese identity card (`--typ
 pteid.add_argument('--pteid-data',
                     action="store",
                     help='JSON file containing pteid card data')
+pteid.add_argument('--pteid_version',
+                    action="store",
+                    help='Choose between identity card v1 or v2')
 
 
 args = parser.parse_args()
@@ -165,7 +168,7 @@ vicc = VirtualICC(args.datasetfile, args.type, hostname, args.port,
         readernum=args.reader, mitmPath=args.mitm, ef_cardaccess=ef_cardaccess_data,
         ef_cardsecurity=ef_cardsecurity_data, ca_key=ca_key_data, cvca=cvca,
         disable_checks=args.disable_ta_checks, esign_ca_cert=esign_ca_cert,
-        esign_cert=esign_cert, pteid_data_file=args.pteid_data, logginglevel=logginglevel)
+        esign_cert=esign_cert, pteid_data_file=args.pteid_data, pteid_version=args.pteid_version, logginglevel=logginglevel)
 try:
     vicc.run()
 except KeyboardInterrupt:

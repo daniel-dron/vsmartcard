@@ -50,8 +50,9 @@ class CardGenerator(object):
     different supported card types. It is also able used for persistent storage
     (in encrypted form) of the card on disks. """
 
-    def __init__(self, card_type=None, sam=None, mf=None):
+    def __init__(self, card_type=None, pteid_version=None, sam=None, mf=None):
         self.type = card_type
+        self.pteid_version = pteid_version
         self.mf = mf
         self.sam = sam
         self.password = None
@@ -685,10 +686,142 @@ class CardGenerator(object):
                 fdata = a2b_base64(fdata)
 
             return name, fci, fdata
+        
+        def ___get_cc2_filesystem(data):            
+            # create the default MF
+            name, fci, fdata = ___get_fs_entry(data, '3f00')
+            default_mf = PTEID_MF(dfname=name) 
+            card_access_name, card_access_fci, card_access_fdata = ___get_fs_entry(data, '3f00-011c')
+            if len(card_access_fdata) != 0:
+                default_mf.append(TransparentStructureEF(parent=default_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
+            default_mf.identifier = "DEFAULT"
+            self.mf = default_mf
+
+            # create NATIONAL DATA MF
+            name, fci, fdata = ___get_fs_entry(data, '3f00')
+            ndata_mf = PTEID_MF(dfname=name)
+            ndata_mf.identifier = "NATIONAL_DATA"
+            ndata_mf.append(TransparentStructureEF(parent=ndata_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
+            for fid in [0x0101, 0x0102, 0x010D, 0x010F, 0x011E, 0x011D]:
+                path = '3f00-604632ff000005-%04x' % (fid, )
+                name, fci, fdata = ___get_fs_entry(data, path)
+                if len(fdata) != 0:
+                    ndata_mf.append(TransparentStructureEF(parent=ndata_mf, fid=fid, data=fdata, extra_fci_data=fci))
+
+            # TODO: DF.ADF_CIA_PKI & DF.ADF_PKI
+            # EID application ID (604632ff000003)
+            name, fci, fdata = ___get_fs_entry(data, '3f00')
+            eid_mf = PTEID_MF(dfname=name)
+            eid_mf.identifier = "EID"
+            eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x011C, data=card_access_fdata, extra_fci_data=card_access_fci))
+            name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000004-2f00')    # EF.DIR
+            if len(fdata) != 0:
+                eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x2f00, data=fdata, extra_fci_data=fci))
+
+            name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000004-0003')    # EF.TRACE
+            if len(fdata) != 0:
+                eid_mf.append(TransparentStructureEF(parent=eid_mf, fid=0x0003, data=fdata, extra_fci_data=fci))
+
+            adf_cia_pki = DF(parent = eid_mf, fid=0x4f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x72') # DF.ADF_CIA_PKI
+            for fid in [0x5031, 0x5032]:
+                name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000004-4f00-%04x' % (fid, ))
+                if len(fdata) != 0:
+                    adf_cia_pki.append(TransparentStructureEF(parent=adf_cia_pki, fid=fid, data=fdata, extra_fci_data=fci))    
+            eid_mf.append(adf_cia_pki)
+
+            adf_pki = DF(parent = eid_mf, fid=0x5f00, dfname=b'\x44\x46\x20\x69\x73\x73\x75\x65\x73') # DF.ADF_PKI
+            for fid in [0xEF01, 0xEF02, 0xEF03, 0xEF04, 0xEF05, 0xEF06, 0xEF07, 0xEF08, 0xEF09,
+                        0xEF0A, 0xEF0B, 0xEF0C, 0xEF0D, 0xEF0E, 0xEF0F, 0xEF10, 0xEF11, 0x4401]:
+                name, fci, fdata = ___get_fs_entry(data, '3f00-604632ff000004-5f00-%04x' % (fid, ))
+                if len(fdata) != 0:
+                    adf_pki.append(TransparentStructureEF(parent=adf_pki, fid=fid, data=fdata, extra_fci_data=fci))
+                else:
+                    print("fdata empty for fid %04x" % (fid))
+            eid_mf.append(adf_pki)
+            ## }}}
+
+            self.app_ids = {
+                b'\x60\x46\x32\xFF\x00\x00\x05': ndata_mf,
+                b'\x60\x46\x32\xFF\x00\x00\x04': eid_mf
+            }
+
+            private_key1 = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
+            private_key2 = binascii.a2b_base64(data.get('sign-private-key', {}).get('data', None))
+
+            print(default_mf)
+
+            return default_mf, private_key1, private_key2
+
+        def ___get_cc_filesystem(data):
+            name, fci, fdata = ___get_fs_entry(data, '3f00')
+            self.mf = PTEID_MF(dfname=name)
+
+            name, fci, fdata = ___get_fs_entry(data, '3f00-0001')
+            fk = DF(parent=self.mf, fid=0x0001,
+                        dfname=name,
+                        extra_fci_data=fci)
+            self.mf.append(fk)
+
+            name, fci, fdata = ___get_fs_entry(data, '3f00-4f01')
+            info_a = DF(parent=self.mf, fid=0x4f01,
+                        dfname=name,
+                        extra_fci_data=fci)
+
+            self.mf.append(info_a)
+
+            # OK
+
+            # EF DIR
+            for fid in [0x2f00, 0x0003]:
+                path = '3f00-%04x' % (fid,)
+                name, fci, fdata = ___get_fs_entry(data, path)
+                self.mf.append(TransparentStructureEF(parent=self.mf, fid=fid,
+                                                    data=fdata,
+                                                    extra_fci_data=fci))
+
+            # TRACE
+
+
+            # ADF CIA PKI
+            name, fci, fdata = ___get_fs_entry(data, '3f00-4f00')
+            adf_cia = DF(parent=self.mf, fid=0x4F00,
+                        dfname=name,
+                        extra_fci_data=fci)
+
+            for fid in [0x5031, 0x5032]:
+                path = '3f00-4f00-%04x' % (fid, )
+                name, fci, fdata = ___get_fs_entry(data, path)
+                adf_cia.append(TransparentStructureEF(parent=adf_cia, fid=fid,
+                                                    data=fdata,
+                                                    extra_fci_data=fci))
+
+            self.mf.append(adf_cia)
+
+            # ADF PKI
+            name, fci, fdata = ___get_fs_entry(data, '3f00-5f00')
+            adf = DF(parent=self.mf, fid=0x5f00, dfname=name, extra_fci_data=fci)
+
+            for fid in [0x4401, 0xef0c, 0xEF02,
+                        0xEF05, 0xEF06, 0xEF07,
+                        0xEF08, 0xEF09, 0xEF0D,
+                        0xEF0E, 0xEF0F, 0xEF10,
+                        0xEF11, 0xEF12]:
+                path = '3f00-5f00-%04x' % (fid, )
+                name, fci, fdata = ___get_fs_entry(data, path)
+                adf.append(TransparentStructureEF(parent=adf, fid=fid,
+                                                data=fdata,
+                                                extra_fci_data=fci))
+
+            self.mf.append(adf)
+            private_key1 = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
+            private_key2 = binascii.a2b_base64(data.get('sign-private-key', {}).get('data', None))
+
+            return self.mf, private_key1, private_key2
+
 
         """Generate the Filesystem and SAM of a cryptoflex card"""
         from virtualsmartcard.cards.PTEID import PTEID_MF
-        from virtualsmartcard.cards.PTEID import PTEID_SAM
+        from virtualsmartcard.cards.PTEID import PTEID_SAM, PTEID_SAM_V2
         import json
         from binascii import a2b_base64
         logging.info(f"Opening data file: {pteid_data_file}")
@@ -696,71 +829,14 @@ class CardGenerator(object):
         f = open(pteid_data_file, 'r')
         data = json.loads(f.read())
         f.close()
-        
-        name, fci, fdata = ___get_fs_entry(data, '3f00')
-        self.mf = PTEID_MF(dfname=name)
-
-        name, fci, fdata = ___get_fs_entry(data, '3f00-0001')
-        fk = DF(parent=self.mf, fid=0x0001,
-                    dfname=name,
-                    extra_fci_data=fci)
-        self.mf.append(fk)
-
-        name, fci, fdata = ___get_fs_entry(data, '3f00-4f01')
-        info_a = DF(parent=self.mf, fid=0x4f01,
-                    dfname=name,
-                    extra_fci_data=fci)
-
-        self.mf.append(info_a)
-
-        # OK
-
-        # EF DIR
-        for fid in [0x2f00, 0x0003]:
-            path = '3f00-%04x' % (fid,)
-            name, fci, fdata = ___get_fs_entry(data, path)
-            self.mf.append(TransparentStructureEF(parent=self.mf, fid=fid,
-                                                  data=fdata,
-                                                  extra_fci_data=fci))
-
-        # TRACE
-
-
-        # ADF CIA PKI
-        name, fci, fdata = ___get_fs_entry(data, '3f00-4f00')
-        adf_cia = DF(parent=self.mf, fid=0x4F00,
-                     dfname=name,
-                     extra_fci_data=fci)
-
-        for fid in [0x5031, 0x5032]:
-            path = '3f00-4f00-%04x' % (fid, )
-            name, fci, fdata = ___get_fs_entry(data, path)
-            adf_cia.append(TransparentStructureEF(parent=adf_cia, fid=fid,
-                                                  data=fdata,
-                                                  extra_fci_data=fci))
-
-        self.mf.append(adf_cia)
-
-        # ADF PKI
-        name, fci, fdata = ___get_fs_entry(data, '3f00-5f00')
-        adf = DF(parent=self.mf, fid=0x5f00, dfname=name, extra_fci_data=fci)
-
-        for fid in [0x4401, 0xef0c, 0xEF02,
-                    0xEF05, 0xEF06, 0xEF07,
-                    0xEF08, 0xEF09, 0xEF0D,
-                    0xEF0E, 0xEF0F, 0xEF10,
-                    0xEF11, 0xEF12]:
-            path = '3f00-5f00-%04x' % (fid, )
-            name, fci, fdata = ___get_fs_entry(data, path)
-            adf.append(TransparentStructureEF(parent=adf, fid=fid,
-                                              data=fdata,
-                                              extra_fci_data=fci))
-
-        self.mf.append(adf)
-        private_key1 = binascii.a2b_base64(data.get('auth-private-key', {}).get('data', None))
-        private_key2 = binascii.a2b_base64(data.get('sign-private-key', {}).get('data', None))
-
-        self.sam = PTEID_SAM(self.mf, auth_private_key=private_key1, sign_private_key=private_key2)
+        if self.pteid_version == "1":
+            mf, private_key1, private_key2 = ___get_cc_filesystem(data);
+            self.sam = PTEID_SAM(mf, auth_private_key=private_key1, sign_private_key=private_key2)
+        elif self.pteid_version == "2":
+            mf, private_key1, private_key2 = ___get_cc2_filesystem(data);
+            self.sam = PTEID_SAM_V2(mf, auth_private_key=private_key1, sign_private_key=private_key2)
+        else:
+            raise ValueError(f"Unknown PTEID version: {self.pteid_version}")
 
     def generateCard(self, pteid_card_data=None):
         """Generate a new card"""
@@ -782,6 +858,9 @@ class CardGenerator(object):
         if self.sam is None or self.mf is None:
             self.generateCard(pteid_card_data)
         return self.mf, self.sam
+
+    def getAppIDs(self):
+       return self.app_ids
 
     def setCard(self, mf=None, sam=None):
         """Set the MF and SAM of the current card"""

@@ -47,9 +47,6 @@ class PTEIDOS(Iso7816OS):
         self.atr = '\x3B\xFF\x96\x00\x00\x81\x31\xFE\x43\x80\x31\x80\x65\xB0\x85\x04\x01\x20\x12\x0F\xFF\x82\x90\x00\xD0'
 
     def execute(self, msg):
-        def notImplemented(*argz, **args):
-            raise SwError(SW["ERR_INSNOTSUPPORTED"])
-
         logger.debug("Command APDU (%d bytes):\n  %s", len(msg),
                      hexdump(msg, indent=2))
         
@@ -65,12 +62,8 @@ class PTEIDOS(Iso7816OS):
 
         try:
             logger.debug(f"Handle {hex(c.ins)}")
-            if c.ins == 0x80:
-                sw, result = self.sam.handle_0x80(c.p1, c.p2, c.data)
-            else:
-                sw, result = self.ins2handler.get(c.ins, notImplemented)(c.p1,
-                                                                         c.p2,
-                                                                         c.data)
+            sw, result = self.handle_execute(c)
+
         except SwError as e:
             #logger.error(self.ins2handler.get(c.ins, None))
             logger.exception("SWERROR")
@@ -84,6 +77,19 @@ class PTEIDOS(Iso7816OS):
 
         r = self.formatResult(c.ins, c.p1, c.p2, c.le, result, sw)
         return r
+    
+    def handle_execute(self, c):
+        def notImplemented(*argz, **args):
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        result = ''
+        
+        if c.ins == 0x80:
+            sw, result = self.sam.handle_0x80(c.p1, c.p2, c.data)
+        else:
+            sw, result = self.ins2handler.get(c.ins, notImplemented)(c.p1,
+                                                                        c.p2,
+                                                                        c.data)
+        return sw, result
 
     def formatResult(self, ins, p1, p2, le, data, sw):
         logger.debug(
@@ -102,6 +108,28 @@ class PTEIDOS(Iso7816OS):
                                        data, sw, False)
         return r
 
+class PTEIDOS_V2(PTEIDOS):
+    def __init__(self, mf, sam, app_ids, ins2handler=None, maxle=MAX_SHORT_LE):
+        PTEIDOS.__init__(self, mf, sam, ins2handler, maxle)
+        self.app_ids = app_ids
+        self.atr = '\x3B\xFF\x96\x00\x00\x81\x31\xFE\x43\x80\x31\x80\x65\xB0\x85\x04\x01\x20\x12\x0F\xFF\x82\x90\x00\xD0'
+
+    def handle_execute(self, c):
+        def notImplemented(*argz, **args):
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        result = ''
+
+        # intercept select AID's to handle MF swap
+        INS_SELECT_AID = c.ins == 0xA4 and c.p1 & 0x4 != 0
+        if INS_SELECT_AID and c.data in self.app_ids:
+            self.swapMf(self.app_ids[c.data])
+            sw = 0x9000
+
+        else:
+            sw, result = self.ins2handler.get(c.ins, notImplemented)(c.p1,
+                                                                        c.p2,
+                                                                        c.data)
+        return sw, result
 
 class PTEID_SE(Security_Environment):
 
@@ -292,6 +320,9 @@ class PTEID_SAM(SAM):
         self.current_SE.key1 = load_der_private_key(sign_private_key, password=None, backend=default_backend())
         self.current_SE.key2 = load_der_private_key(auth_private_key, password=None, backend=default_backend())
 
+    def getCurrentApplication(self):
+        return self.mf.identifier
+
     def change_reference_data(self, p1, p2, data):
         self.verify(p1, p2, data[:4])
 
@@ -325,17 +356,12 @@ class PTEID_SAM(SAM):
     def verify(self, p1, p2, PIN):
         PIN = PIN.replace(b"\xFF", b"")        # Strip \xFF characters
         logger.debug("PIN to use: %s", PIN)
-        
-        logger.debug("READIGN ADDRESS!!!\n")
-        logger.debug("READIGN ADDRESS!!!\n")
-        logger.debug("READIGN ADDRESS!!!\n")
-        logger.debug("READIGN ADDRESS!!!\n")
-        logger.debug(f"READIGN {p2} {self.ADDR_PIN_ID}\n")
+
         pin_info = self.PIN_INFO[p2]
 
         #A VERIFY command without PIN value means GET RETRY counter
         if len(PIN) == 0:
-            return 0x63C0 | pin_info['counter'], b''
+            return 0x63C0 | pin_info['counter'], ""
         if pin_info['counter'] > 0:
             #XX: The unblock PINs actually have 5 retries
             if pin_info['value'] == PIN:
@@ -349,6 +375,29 @@ class PTEID_SAM(SAM):
         else:
             raise SwError(SW["ERR_AUTHBLOCKED"])
 
+class PTEID_SAM_V2(PTEID_SAM):
+    def __init__(self, mf=None, auth_private_key=None, sign_private_key=None):
+        PTEID_SAM.__init__(self, mf, auth_private_key, sign_private_key)
+
+    def change_reference_data(self, p1, p2, data):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        return super().change_reference_data(p1, p2, data)
+    
+    def verificationStatus(self, id):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        return super().verificationStatus(id)
+    
+    def resetVerificationStatus(self, id):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        return super().resetVerificationStatus(id)
+    
+    def verify(self, p1, p2, PIN):
+        if self.getCurrentApplication() != "EID":
+            raise SwError(SW["ERR_INSNOTSUPPORTED"])
+        return super().verify(p1, p2, PIN)
 class PTEID_MF(MF):  # {{{
     def getDataPlain(self, p1, p2, data):
 
@@ -409,10 +458,6 @@ class PTEID_MF(MF):  # {{{
         # Patch instruction to Find MF to replicate PTEID behavior
         if data == b'\x4f\x00':
             p1 |= 8
-
-        # Patch Applet AID
-        if data == b'\x60\x46\x32\xFF\x00\x00\x02':
-            return 0x9000, b''
 
         # Will fail with exception if File Not Found
         file = self._selectFile(p1, p2, data)
