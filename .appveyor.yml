@@ -39,6 +39,7 @@ install:
  - pip install virtualenv
  - pip install -U setuptools
  - pip install pycryptodomex
+ - pip install cryptography
  - pip install pbkdf2
  - pip install Pillow
  - pip install pyreadline3
