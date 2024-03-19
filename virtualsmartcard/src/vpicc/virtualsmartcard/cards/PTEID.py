@@ -58,7 +58,7 @@ class PTEIDOS(Iso7816OS):
                                      SW["ERR_INCORRECTPARAMETERS"])
         
         result = ''
-        sw = 0x900
+        sw = 0x9000
 
         try:
             logger.debug(f"Handle {hex(c.ins)}")
@@ -378,6 +378,11 @@ class PTEID_SAM(SAM):
 class PTEID_SAM_V2(PTEID_SAM):
     def __init__(self, mf=None, auth_private_key=None, sign_private_key=None):
         PTEID_SAM.__init__(self, mf, auth_private_key, sign_private_key)
+        self.AUTH_KEY_ID = 6
+        self.SIGN_KEY_ID = 8
+        
+        self.KEY_IDS[self.AUTH_KEY_ID] = self.AUTH_PIN_ID
+        self.KEY_IDS[self.SIGN_KEY_ID] = self.SIGN_PIN_ID
 
     def change_reference_data(self, p1, p2, data):
         if self.getCurrentApplication() != "EID":
