@@ -172,13 +172,17 @@ pteid_version = args.pteid_version
 input_file = args.input
 output_file = args.output
 
-json_data = {}
+if not input_file:
+    input_file = "cc1_base.json" if pteid_version == 'cc1' else "cc2_base.json"
 
+if not output_file:
+    output_file = "card.json"
+
+json_data = {}
 if input_file and not os.path.exists(input_file):
     print("Input file does not exist")
     exit(1)
 
-# check if input file exists, read contents from it and load the json data if possible
 try:
     with open(input_file, 'r') as f:
         json_data = json.load(f)
@@ -299,6 +303,4 @@ for k in data:
 json_data.update(data)
 
 with open(output_file, 'w') as f:
-    json.dump(json_data, f, indent=4,)
-
-print("Card Generated to card.json")
+    json.dump(json_data, f, indent=4)
