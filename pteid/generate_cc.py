@@ -152,6 +152,40 @@ class CC2Generator(CCGenerator):
     def generate_user_certificate(self, subject, key_usage, issuer, signing_key, start_date=None, end_date=None):
         return super().generate_user_certificate(subject, key_usage, issuer, signing_key, start_date, end_date)
 
+def generateJson(user_auth, user_auth_private_key, user_sign, user_sign_private_key, ec_cc, ec_auth, ec_sign):
+    data = {}
+    data[generator.fs_paths["cert_auth"]] = {'data': b2a_base64(user_auth.public_bytes(encoding=serialization.Encoding.DER)),
+                            'fci': b2a_base64(b'\x8C\x05\x1B\xFF\xFF\xFF\x00')}
+
+    data["auth-private-key"] = {'data': b2a_base64(user_auth_private_key.private_bytes(encoding=serialization.Encoding.DER,
+                                        format=serialization.PrivateFormat.TraditionalOpenSSL,
+                                        encryption_algorithm=serialization.NoEncryption()))}
+
+    data[generator.fs_paths["cert_sign"]]  = {'data': b2a_base64(user_sign.public_bytes(encoding=serialization.Encoding.DER)),
+                            'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
+
+    data["sign-private-key"] = {'data': b2a_base64(user_sign_private_key.private_bytes(encoding=serialization.Encoding.DER,
+                    format=serialization.PrivateFormat.TraditionalOpenSSL,
+                    encryption_algorithm=serialization.NoEncryption()))}
+
+    data[generator.fs_paths["cert_root"]]  = {'data': b2a_base64(ec_cc.public_bytes(encoding=serialization.Encoding.DER)),
+                            'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
+
+
+    data[generator.fs_paths["cert_root_auth"]] = {'data': b2a_base64(ec_auth.public_bytes(encoding=serialization.Encoding.DER)),
+                            'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
+
+    data[generator.fs_paths["cert_root_sign"]]  = {'data': b2a_base64(ec_sign.public_bytes(encoding=serialization.Encoding.DER)),
+                            'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
+
+    for k in data:
+        for kk in data[k]:
+            if isinstance(data[k][kk], bytes):
+                data[k][kk] = data[k][kk].decode().strip()
+    
+    return data
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--pteid_version',
     action="store",
@@ -262,45 +296,7 @@ subject = x509.Name([
 ])
 user_sign, user_sign_private_key = generator.generate_user_certificate(subject, CCGenerator.KeyUsage.DIGITAL_SIGNATURE.value, ec_sign.subject, ec_sign_private_key)
 
-
-data = {}
-
-#       EF09 - Cert Auth
-data[generator.fs_paths["cert_auth"]] = {'data': b2a_base64(user_auth.public_bytes(encoding=serialization.Encoding.DER)),
-                          'fci': b2a_base64(b'\x8C\x05\x1B\xFF\xFF\xFF\x00')}
-
-data["auth-private-key"] = {'data': b2a_base64(user_auth_private_key.private_bytes(encoding=serialization.Encoding.DER,
-                                    format=serialization.PrivateFormat.TraditionalOpenSSL,
-                                    encryption_algorithm=serialization.NoEncryption()))}
-
-#       EF08 - Cert Sign
-data[generator.fs_paths["cert_sign"]]  = {'data': b2a_base64(user_sign.public_bytes(encoding=serialization.Encoding.DER)),
-                          'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
-
-data["sign-private-key"] = {'data': b2a_base64(user_sign_private_key.private_bytes(encoding=serialization.Encoding.DER,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()))}
-
-#       EF11 - Cert Root
-data[generator.fs_paths["cert_root"]]  = {'data': b2a_base64(ec_cc.public_bytes(encoding=serialization.Encoding.DER)),
-                          'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
-
-
-#       EF10 - Cert Root Auth
-data[generator.fs_paths["cert_root_auth"]] = {'data': b2a_base64(ec_auth.public_bytes(encoding=serialization.Encoding.DER)),
-                          'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
-
-#       EF0F - Cert Root Sign
-data[generator.fs_paths["cert_root_sign"]]  = {'data': b2a_base64(ec_sign.public_bytes(encoding=serialization.Encoding.DER)),
-                          'fci': b2a_base64(b'\x8C\x05\x1B\xFF\x00\xFF\x00')}
-
-for k in data:
-    for kk in data[k]:
-        if isinstance(data[k][kk], bytes):
-            data[k][kk] = data[k][kk].decode().strip()
-
-
-json_data.update(data)
+json_data.update(generateJson(user_auth, user_auth_private_key, user_sign, user_sign_private_key, ec_cc, ec_auth, ec_sign))
 
 with open(output_file, 'w') as f:
     json.dump(json_data, f, indent=4)
