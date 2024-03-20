@@ -1,0 +1,6 @@
+pycryptodome
+cryptography
+pbkdf2
+Pillow
+pyreadline3
+pyscard
