@@ -1,3 +1,4 @@
+import os
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
@@ -8,6 +9,7 @@ from binascii import b2a_base64
 import datetime
 import uuid
 from enum import Enum
+import argparse
 
 class CCGenerator():
     class KeyUsage(Enum):
@@ -15,7 +17,7 @@ class CCGenerator():
         NON_REPUDIATION = 2
     
     class CertificateType(Enum):
-        EC = 1
+        ROOT = 1
         USER = 2
 
     def __init__(self):
@@ -33,14 +35,14 @@ class CCGenerator():
         self.fs_paths["cert_root_sign"] = "3f00-5f00-ef0f"
 
     def generatePrivateKey(self, certificate_type):
-        if certificate_type == CCGenerator.CertificateType.EC:
+        if certificate_type == CCGenerator.CertificateType.ROOT:
             return rsa.generate_private_key(65537, 4096, default_backend())
         elif certificate_type == CCGenerator.CertificateType.USER:
             return rsa.generate_private_key(65537, 3072, default_backend())
 
     def generate_ec(self, subject, start_date = None, end_date = None, issuer = None, signing_key = None):
         # Generate our key
-        private_key = self.generatePrivateKey(CCGenerator.CertificateType.EC)
+        private_key = self.generatePrivateKey(CCGenerator.CertificateType.ROOT)
 
         public_key = private_key.public_key()
 
@@ -139,7 +141,7 @@ class CC2Generator(CCGenerator):
         self.fs_paths["cert_root_sign"] = "3f00-604632ff000004-5f00-ef08"
 
     def generatePrivateKey(self, certificate_type):
-        if certificate_type == CCGenerator.CertificateType.EC:
+        if certificate_type == CCGenerator.CertificateType.ROOT:
             return ec.generate_private_key(ec.SECP384R1(), default_backend())
         elif certificate_type == CCGenerator.CertificateType.USER:
             return ec.generate_private_key(ec.SECP256R1(), default_backend())
@@ -150,7 +152,40 @@ class CC2Generator(CCGenerator):
     def generate_user_certificate(self, subject, key_usage, issuer, signing_key, start_date=None, end_date=None):
         return super().generate_user_certificate(subject, key_usage, issuer, signing_key, start_date, end_date)
 
-generator = CC2Generator()
+parser = argparse.ArgumentParser()
+parser.add_argument('--pteid_version',
+    action="store",
+    choices=['cc1', 'cc2'],
+    default='cc1',
+    help='Choose between identity card v1 or v2')
+
+parser.add_argument("-i", "--input",
+    action="store",
+    help="Input file with the card data")
+
+parser.add_argument("-o", "--output",
+    action="store",
+    help="Output file with the card data")
+
+args = parser.parse_args()
+pteid_version = args.pteid_version
+input_file = args.input
+output_file = args.output
+
+json_data = {}
+
+if input_file and not os.path.exists(input_file):
+    print("Input file does not exist")
+    exit(1)
+
+# check if input file exists, read contents from it and load the json data if possible
+try:
+    with open(input_file, 'r') as f:
+        json_data = json.load(f)
+except Exception as e:
+    json_data = {}
+
+generator = CCGenerator() if pteid_version == 'cc1' else CC2Generator()
 # Generate the CA certificate
 force_create = True
 subject = x509.Name([
@@ -260,9 +295,10 @@ for k in data:
         if isinstance(data[k][kk], bytes):
             data[k][kk] = data[k][kk].decode().strip()
 
-with open('card.json', 'w') as f:
-    content = json.dumps(data, indent=4, default=str)
-    f.write(content)
-    f.close()
+
+json_data.update(data)
+
+with open(output_file, 'w') as f:
+    json.dump(json_data, f, indent=4,)
 
 print("Card Generated to card.json")
