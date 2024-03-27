@@ -50,9 +50,8 @@ class CardGenerator(object):
     different supported card types. It is also able used for persistent storage
     (in encrypted form) of the card on disks. """
 
-    def __init__(self, card_type=None, pteid_version=None, sam=None, mf=None):
+    def __init__(self, card_type=None, sam=None, mf=None):
         self.type = card_type
-        self.pteid_version = pteid_version
         self.mf = mf
         self.sam = sam
         self.password = None
@@ -829,14 +828,12 @@ class CardGenerator(object):
         f = open(pteid_data_file, 'r')
         data = json.loads(f.read())
         f.close()
-        if self.pteid_version == "1":
+        if self.type == "PTEID1":
             mf, private_key1, private_key2 = ___get_cc_filesystem(data);
             self.sam = PTEID_SAM(mf, auth_private_key=private_key1, sign_private_key=private_key2)
-        elif self.pteid_version == "2":
+        elif self.type == "PTEID2":
             mf, private_key1, private_key2 = ___get_cc2_filesystem(data);
             self.sam = PTEID_SAM_V2(mf, auth_private_key=private_key1, sign_private_key=private_key2)
-        else:
-            raise ValueError(f"Unknown PTEID version: {self.pteid_version}")
 
     def generateCard(self, pteid_card_data=None):
         """Generate a new card"""
@@ -848,7 +845,7 @@ class CardGenerator(object):
             self.__generate_cryptoflex()
         elif self.type == 'nPA':
             self.__generate_nPA()
-        elif self.type == 'PTEID':
+        elif self.type == 'PTEID1' or self.type == 'PTEID2':
             self.__generate_PTEID(pteid_card_data)
         else:
             return (None, None)
