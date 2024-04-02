@@ -185,9 +185,13 @@ def generateJson(user_auth, user_auth_private_key, user_sign, user_sign_private_
     
     return data
 
+def export_certificate(file_name, cert):
+    with open(file_name, 'wb') as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--pteid_version',
+    required=True,
     action="store",
     choices=['cc1', 'cc2'],
     default='cc1',
@@ -200,6 +204,10 @@ parser.add_argument("-i", "--input",
 parser.add_argument("-o", "--output",
     action="store",
     help="Output file with the card data")
+
+parser.add_argument("-r", "--export-root",
+    action="store",
+    help="Export the root certificate and private key")
 
 args = parser.parse_args()
 pteid_version = args.pteid_version
@@ -235,6 +243,10 @@ subject = x509.Name([
     x509.NameAttribute(NameOID.COUNTRY_NAME, u'PT')
 ])
 ec_cc, ec_cc_private_key = generator.generate_ec(subject)
+
+# export root certificate
+if (args.export_root):
+    export_certificate(args.export_root, ec_cc)
 
 # Generate EC Authentication certificate
 subject = x509.Name([
