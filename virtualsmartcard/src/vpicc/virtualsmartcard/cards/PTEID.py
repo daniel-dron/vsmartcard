@@ -104,6 +104,10 @@ class PTEIDOS(Iso7816OS):
             r = R_APDU(inttostring(SW["NORMAL_REST"] +
                                    min(0xff, len(data) ))).render()
         else:
+            
+            if le is None:
+                le = 0
+
             r = Iso7816OS.formatResult(self, Iso7816OS.seekable(ins), le,
                                        data, sw, False)
         return r
